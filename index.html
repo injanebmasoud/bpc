@@ -24,46 +24,86 @@
     #results {
       margin-top: 20px;
     }
+    .error-info {
+      background: #ffffcc;
+      padding: 10px;
+      border: 1px solid #cccc00;
+      margin: 10px 0;
+    }
+    .corrected-table {
+      margin-top: 15px;
+    }
+    .formula-info {
+      background: #e6f3ff;
+      padding: 10px;
+      border: 1px solid #0066cc;
+      margin: 10px 0;
+    }
   </style>
 </head>
 <body>
-  <h1>محاسبه پیمایش بسته (با ژیزمان صحیح)</h1>
+  <h1>محاسبه پیمایش بسته</h1>
+
+  <div class="formula-info">
+    <strong>انواع زوایا:</strong><br>
+    • <strong>زاویه داخلی:</strong> زاویه بین دو ضلع از داخل چندضلعی<br>
+    • <strong>زاویه خارجی:</strong> زاویه بین دو ضلع از خارج چندضلعی<br>
+    • <strong>زاویه انحراف:</strong> زاویه انحراف از مسیر مستقیم (راست/چپ)<br>
+    <strong>فرمول آزیموت:</strong><br>
+    • زاویه داخلی/خارجی: آزیموت جدید = آزیموت قبلی ± زاویه + 180°<br>
+    • زاویه انحراف: آزیموت جدید = آزیموت قبلی ± زاویه انحراف
+  </div>
 
   <label>آزیموت شروع (درجه):</label>
-  <input type="number" id="azimuthStart" value="90"><br><br>
+  <input type="number" id="azimuthStart" value="0"><br><br>
+
+  <label>نوع زاویه:</label>
+  <select id="angleType">
+    <option value="internal">زاویه داخلی</option>
+    <option value="external">زاویه خارجی</option>
+    <option value="deflection">زاویه انحراف (Deflection)</option>
+  </select><br><br>
+
+  <label>جهت حرکت:</label>
+  <select id="direction">
+    <option value="clockwise">ساعتگرد</option>
+    <option value="counterclockwise">پادساعتگرد</option>
+  </select><br><br>
 
   <table id="inputTable">
     <thead>
       <tr>
         <th>نقطه</th>
-        <th>زاویه داخلی (°)</th>
-        <th>طول ضلع (m)</th>
+        <th>زاویه (°)</th>
+        <th>طول (m)</th>
       </tr>
     </thead>
     <tbody>
       <tr>
         <td>1</td>
-        <td><input type="number" value="90"></td>
+        <td><input type="number" value="90" step="0.0001"></td>
         <td><input type="number" value="100"></td>
       </tr>
       <tr>
         <td>2</td>
-        <td><input type="number" value="90"></td>
+        <td><input type="number" value="90" step="0.0001"></td>
         <td><input type="number" value="100"></td>
       </tr>
       <tr>
         <td>3</td>
-        <td><input type="number" value="90"></td>
+        <td><input type="number" value="90" step="0.0001"></td>
         <td><input type="number" value="100"></td>
       </tr>
       <tr>
         <td>4</td>
-        <td><input type="number" value="90"></td>
+        <td><input type="number" value="90" step="0.0001"></td>
         <td><input type="number" value="100"></td>
       </tr>
     </tbody>
   </table>
   <br>
+  <button onclick="addRow()">افزودن نقطه</button>
+  <button onclick="removeRow()">حذف نقطه</button>
   <button onclick="calculate()">محاسبه</button>
 
   <div id="results"></div>
@@ -73,37 +113,107 @@
       return deg * Math.PI / 180;
     }
 
+    function radToDeg(rad) {
+      return rad * 180 / Math.PI;
+    }
+
     function fixAngle(angle) {
-      angle = angle % 360;
-      return angle < 0 ? angle + 360 : angle;
+      while (angle >= 360) angle -= 360;
+      while (angle < 0) angle += 360;
+      return angle;
+    }
+
+    function addRow() {
+      const tbody = document.querySelector('#inputTable tbody');
+      const rowCount = tbody.rows.length;
+      const newRow = tbody.insertRow();
+      newRow.innerHTML = `
+        <td>${rowCount + 1}</td>
+        <td><input type="number" value="90" step="0.0001"></td>
+        <td><input type="number" value="100"></td>
+      `;
+    }
+
+    function removeRow() {
+      const tbody = document.querySelector('#inputTable tbody');
+      if (tbody.rows.length > 3) {
+        tbody.deleteRow(tbody.rows.length - 1);
+      }
     }
 
     function calculate() {
       const az0 = parseFloat(document.getElementById('azimuthStart').value);
+      const angleType = document.getElementById('angleType').value;
+      const direction = document.getElementById('direction').value;
       const table = document.querySelectorAll('#inputTable tbody tr');
 
-      const angles = [];
+      let angles = [];
+      const originalAngles = [];
       const lengths = [];
       table.forEach(row => {
-        angles.push(parseFloat(row.cells[1].querySelector('input').value));
+        const angle = parseFloat(row.cells[1].querySelector('input').value);
+        originalAngles.push(angle);
+        angles.push(angle);
         lengths.push(parseFloat(row.cells[2].querySelector('input').value));
       });
 
       const n = angles.length;
-      const azimuths = [fixAngle(az0)];
+      const azimuths = [];
       const deltaX = [], deltaY = [];
 
-      // محاسبه آزیموت‌ها با فرمول درست مسیر ساعت‌گرد
-      for (let i = 0; i < n; i++) {
-        const az = fixAngle(azimuths[i] + (360 - angles[i]));
-        azimuths.push(az);
+      // محاسبه آزیموت‌ها بر اساس نوع زاویه
+      let currentAzimuth = az0;
+      azimuths.push(currentAzimuth);
+
+      if (angleType === 'deflection') {
+        // برای زوایای انحراف
+        for (let i = 0; i < n; i++) {
+          // زاویه انحراف: آزیموت جدید = آزیموت قبلی + زاویه انحراف
+          // (مثبت برای انحراف راست، منفی برای انحراف چپ)
+          currentAzimuth = fixAngle(currentAzimuth + angles[i]);
+          if (i < n - 1) {
+            azimuths.push(currentAzimuth);
+          }
+        }
+      } else {
+        // تبدیل زوایای خارجی به داخلی در صورت نیاز
+        if (angleType === 'external') {
+          angles = angles.map(angle => 180 - angle);
+        }
+
+        // برای زوایای داخلی/خارجی
+        for (let i = 0; i < n; i++) {
+          if (direction === 'clockwise') {
+            currentAzimuth = fixAngle(currentAzimuth - angles[i] + 180);
+          } else {
+            currentAzimuth = fixAngle(currentAzimuth + angles[i] - 180);
+          }
+          
+          if (i < n - 1) {
+            azimuths.push(currentAzimuth);
+          }
+        }
+      }
+
+      // بررسی مجموع زوایا (فقط برای زوایای داخلی/خارجی)
+      let angleSum, expectedSum, angleError;
+      if (angleType !== 'deflection') {
+        angleSum = angles.reduce((a, b) => a + b, 0);
+        expectedSum = (n - 2) * 180;
+        angleError = angleSum - expectedSum;
+      } else {
+        // برای زوایای انحراف، مجموع باید 360° یا مضرب آن باشد
+        angleSum = originalAngles.reduce((a, b) => a + b, 0);
+        expectedSum = 360;
+        angleError = angleSum % 360;
+        if (angleError > 180) angleError -= 360;
       }
 
       // محاسبه مؤلفه‌ها
       for (let i = 0; i < n; i++) {
-        const azRad = degToRad(azimuths[i]);
-        deltaX.push(lengths[i] * Math.sin(azRad));
-        deltaY.push(lengths[i] * Math.cos(azRad));
+        const az = degToRad(azimuths[i]);
+        deltaX.push(lengths[i] * Math.sin(az));
+        deltaY.push(lengths[i] * Math.cos(az));
       }
 
       // محاسبه مختصات با نقطه شروع (1000, 1000)
@@ -116,31 +226,96 @@
         });
       }
 
-      // محاسبه خطای بست
-      const fx = coords[n].x - 1000;
-      const fy = coords[n].y - 1000;
+      // خطای بست
+      const fx = coords[n].x - coords[0].x;
+      const fy = coords[n].y - coords[0].y;
       const fb = Math.sqrt(fx * fx + fy * fy);
       const lenSum = lengths.reduce((a, b) => a + b, 0);
-      const errRatio = fb / lenSum;
+      const errRatio = fb > 0 ? lenSum / fb : Infinity;
 
-      // نمایش جدول نتایج
-      let html = `<h3>📊 نتایج پیمایش</h3><table><tr><th>نقطه</th><th>آزیموت (°)</th><th>ΔX</th><th>ΔY</th><th>X</th><th>Y</th></tr>`;
-      for (let i = 0; i < coords.length; i++) {
+      // تصحیح خطا (توزیع متناسب با طول - روش کمپاس)
+      const correctedCoords = [{x: 1000, y: 1000}];
+      let cumLength = 0;
+      
+      for (let i = 0; i < n; i++) {
+        cumLength += lengths[i];
+        const correctionFactor = cumLength / lenSum;
+        
+        const correctedX = coords[i + 1].x - fx * correctionFactor;
+        const correctedY = coords[i + 1].y - fy * correctionFactor;
+        
+        correctedCoords.push({x: correctedX, y: correctedY});
+      }
+
+      // نمایش نتایج
+      let html = `<div class="error-info">
+        <strong>نوع زاویه:</strong> ${angleType === 'internal' ? 'داخلی' : angleType === 'external' ? 'خارجی' : 'انحراف'}<br>
+        ${angleType !== 'deflection' ? `<strong>جهت حرکت:</strong> ${direction === 'clockwise' ? 'ساعتگرد' : 'پادساعتگرد'}<br>` : ''}
+        <strong>بررسی زوایا:</strong><br>
+        مجموع زوایا: ${angleSum.toFixed(4)}°<br>
+        ${angleType === 'deflection' ? 
+          `انتظار: مضرب 360° (خطای انحراف: ${angleError.toFixed(4)}°)` : 
+          `مجموع نظری: ${expectedSum}° (خطای زاویه‌ای: ${angleError.toFixed(4)}°)`}<br>
+        ${Math.abs(angleError) < 0.1 ? '✅ زوایا صحیح هستند' : '❌ لطفاً نوع زاویه یا مقادیر را بررسی کنید'}
+      </div>`;
+
+      html += `<h3>محاسبات اولیه (قبل از تصحیح)</h3>
+      <table>
+        <tr><th>نقطه</th><th>آزیموت (°)</th><th>طول (m)</th><th>ΔX (m)</th><th>ΔY (m)</th><th>X (m)</th><th>Y (m)</th></tr>`;
+      
+      for (let i = 0; i < n; i++) {
         html += `<tr>
           <td>${i + 1}</td>
-          <td>${azimuths[i] !== undefined ? azimuths[i].toFixed(8) : '-'}</td>
-          <td>${deltaX[i] !== undefined ? deltaX[i].toFixed(4) : '-'}</td>
-          <td>${deltaY[i] !== undefined ? deltaY[i].toFixed(4) : '-'}</td>
-          <td>${coords[i].x.toFixed(4)}</td>
-          <td>${coords[i].y.toFixed(4)}</td>
+          <td>${azimuths[i].toFixed(6)}</td>
+          <td>${lengths[i]}</td>
+          <td>${deltaX[i].toFixed(6)}</td>
+          <td>${deltaY[i].toFixed(6)}</td>
+          <td>${coords[i].x.toFixed(6)}</td>
+          <td>${coords[i].y.toFixed(6)}</td>
         </tr>`;
       }
-      html += `</table><br>
-        <strong>خطای بست:</strong> ${fb.toFixed(4)} متر<br>
-        <strong>نسبت خطا:</strong> 1:${errRatio > 0 ? Math.round(1 / errRatio) : '∞'}`;
+      // نقطه آخر (بازگشت به شروع)
+      html += `<tr style="background-color: #ffcccc;">
+        <td>${n + 1}</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>${coords[n].x.toFixed(6)}</td>
+        <td>${coords[n].y.toFixed(6)}</td>
+      </tr>`;
+      html += `</table>`;
+
+      html += `<br><div class="error-info">
+        <strong>خطای بست:</strong> ${fb.toFixed(6)} متر<br>
+        <strong>نسبت خطا:</strong> 1:${Math.round(errRatio)}<br>
+        <strong>خطای X:</strong> ${fx.toFixed(6)} متر<br>
+        <strong>خطای Y:</strong> ${fy.toFixed(6)} متر<br>
+        <strong>دقت:</strong> ${fb < 0.01 ? '✅ عالی' : fb < 0.1 ? '✅ خوب' : fb < 1 ? '⚠️ قابل قبول' : '❌ ضعیف'}
+      </div>`;
+
+      if (fb > 0.001) {
+        html += `<h3 class="corrected-table">مختصات تصحیح شده</h3>
+        <table>
+          <tr><th>نقطه</th><th>X تصحیح شده</th><th>Y تصحیح شده</th></tr>`;
+        
+        for (let i = 0; i <= n; i++) {
+          html += `<tr>
+            <td>${i + 1}</td>
+            <td>${correctedCoords[i].x.toFixed(6)}</td>
+            <td>${correctedCoords[i].y.toFixed(6)}</td>
+          </tr>`;
+        }
+        html += `</table>`;
+      }
 
       document.getElementById('results').innerHTML = html;
     }
+
+    // محاسبه خودکار در شروع
+    window.onload = function() {
+      calculate();
+    };
   </script>
 </body>
 </html>
