@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -16,9 +17,10 @@
       border: 1px solid #444;
       border-collapse: collapse;
       padding: 6px;
+      text-align: center;
     }
     input {
-      width: 60px;
+      width: 80px;
     }
     #results {
       margin-top: 20px;
@@ -72,10 +74,6 @@
       return deg * Math.PI / 180;
     }
 
-    function radToDeg(rad) {
-      return rad * 180 / Math.PI;
-    }
-
     function fixAngle(angle) {
       angle = angle % 360;
       return angle < 0 ? angle + 360 : angle;
@@ -109,8 +107,8 @@
         deltaY.push(lengths[i] * Math.cos(az));
       }
 
-      // محاسبه مختصات
-      const coords = [{x: 0, y: 0}];
+      // محاسبه مختصات با نقطه شروع 1000,1000
+      const coords = [{x: 1000, y: 1000}];
       for (let i = 0; i < n; i++) {
         const prev = coords[i];
         coords.push({
@@ -120,8 +118,8 @@
       }
 
       // خطای بست
-      const fx = coords[n].x;
-      const fy = coords[n].y;
+      const fx = coords[n].x - 1000;
+      const fy = coords[n].y - 1000;
       const fb = Math.sqrt(fx * fx + fy * fy);
       const lenSum = lengths.reduce((a, b) => a + b, 0);
       const errRatio = fb / lenSum;
@@ -131,16 +129,16 @@
       for (let i = 0; i < n + 1; i++) {
         html += `<tr>
           <td>${i + 1}</td>
-          <td>${azimuths[i] ? azimuths[i].toFixed(2) : '-'}</td>
-          <td>${deltaX[i] !== undefined ? deltaX[i].toFixed(2) : '-'}</td>
-          <td>${deltaY[i] !== undefined ? deltaY[i].toFixed(2) : '-'}</td>
-          <td>${coords[i].x.toFixed(2)}</td>
-          <td>${coords[i].y.toFixed(2)}</td>
+          <td>${azimuths[i] !== undefined ? azimuths[i].toFixed(8) : '-'}</td>
+          <td>${deltaX[i] !== undefined ? deltaX[i].toFixed(8) : '-'}</td>
+          <td>${deltaY[i] !== undefined ? deltaY[i].toFixed(8) : '-'}</td>
+          <td>${coords[i].x.toFixed(8)}</td>
+          <td>${coords[i].y.toFixed(8)}</td>
         </tr>`;
       }
       html += `</table><br>
-        <strong>خطای بست:</strong> ${fb.toFixed(3)} متر<br>
-        <strong>نسبت خطا:</strong> 1:${Math.round(1 / errRatio)}
+        <strong>خطای بست:</strong> ${fb.toFixed(8)} متر<br>
+        <strong>نسبت خطا:</strong> 1:${errRatio > 0 ? Math.round(1 / errRatio) : '∞'}
       `;
 
       document.getElementById('results').innerHTML = html;
