@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>محاسبه پیمایش بسته ساعت‌گرد</title>
+  <style>
+    body {
+      font-family: Tahoma, sans-serif;
+      background: #fafafa;
+      padding: 20px;
+      max-width: 700px;
+      margin: auto;
+      direction: rtl;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 15px;
+      display: block;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      box-sizing: border-box;
+      font-size: 16px;
+      font-family: monospace;
+    }
+    button {
+      margin-top: 15px;
+      padding: 12px;
+      font-size: 16px;
+      background: #006699;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 25px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #eee;
+    }
+    .result {
+      background: white;
+      padding: 15px;
+      margin-top: 25px;
+      border-radius: 6px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+
+<h1>محاسبه پیمایش بسته ساعت‌گرد</h1>
+
+<label for="startAz">آزیموت شروع (درجه):</label>
+<input type="number" id="startAz" value="73.356" step="0.001" />
+
+<label for="inputData">داده‌ها (هر خط: زاویه داخلی درجه، طول متر):</label>
+<textarea id="inputData" rows="6" placeholder="مثال:
+104.728 325.789
+89.638 512.346
+97.285 430.182
+86.912 604.721
+"></textarea>
+
+<button onclick="calculateTraverse()">محاسبه</button>
+
+<div id="output" class="result"></div>
+
+<script>
+  // تبدیل درجه به رادیان
+  function degToRad(deg) {
+    return deg * Math.PI / 180;
+  }
+  
+  // تبدیل رادیان به درجه با محدوده 0-360
+  function normalizeDeg(angle) {
+    angle = angle % 360;
+    return angle < 0 ? angle + 360 : angle;
+  }
+  
+  function calculateTraverse() {
+    const startAz = parseFloat(document.getElementById('startAz').value);
+    const dataText = document.getElementById('inputData').value.trim();
+    if (!dataText) {
+      alert("لطفا داده‌ها را وارد کنید");
+      return;
+    }
+    
+    const lines = dataText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const n = lines.length;
+    
+    // آرایه‌ها
+    const angles = [];
+    const lengths = [];
+    
+    // خواندن زاویه داخلی و طول هر ضلع
+    for(let i=0; i<n; i++) {
+      const parts = lines[i].split(/\s+/);
+      if(parts.length < 2){
+        alert(`خط ${i+1} ناقص است!`);
+        return;
+      }
+      const angle = parseFloat(parts[0]);
+      const length = parseFloat(parts[1]);
+      if(isNaN(angle) || isNaN(length)) {
+        alert(`خط ${i+1} مقدار نامعتبر دارد!`);
+        return;
+      }
+      angles.push(angle);
+      lengths.push(length);
+    }
+    
+    // محاسبه آزیموت‌ها در پیمایش ساعت‌گرد با فرمول:
+    // A[i+1] = A[i] - (180 - angle[i])
+    const azimuths = [normalizeDeg(startAz)];
+    for(let i=0; i<n; i++) {
+      let newAz = azimuths[i] - (180 - angles[i]);
+      newAz = normalizeDeg(newAz);
+      azimuths.push(newAz);
+    }
+    
+    // محاسبه ΔX و ΔY و مختصات هر نقطه
+    const deltaX = [];
+    const deltaY = [];
+    const coords = [{x:0, y:0}];
+    
+    for(let i=0; i<n; i++) {
+      let rad = degToRad(azimuths[i]);
+      let dx = lengths[i] * Math.sin(rad);
+      let dy = lengths[i] * Math.cos(rad);
+      deltaX.push(dx);
+      deltaY.push(dy);
+      coords.push({x: coords[i].x + dx, y: coords[i].y + dy});
+    }
+    
+    // محاسبه خطای بست
+    let fx = coords[n].x;
+    let fy = coords[n].y;
+    let f = Math.sqrt(fx*fx + fy*fy);
+    
+    // جمع طول‌ها
+    let Lsum = lengths.reduce((a,b) => a+b, 0);
+    let errorRatio = Lsum / f;
+    
+    // نمایش نتایج
+    let html = `<table>
+      <tr><th>نقطه</th><th>آزیموت (°)</th><th>ΔX (متر)</th><th>ΔY (متر)</th><th>X (متر)</th><th>Y (متر)</th></tr>`;
+    
+    for(let i=0; i<=n; i++) {
+      html += `<tr>
+        <td>${i+1}</td>
+        <td>${(azimuths[i] !== undefined ? azimuths[i].toFixed(2) : '-')}</td>
+        <td>${(deltaX[i] !== undefined ? deltaX[i].toFixed(2) : '-')}</td>
+        <td>${(deltaY[i] !== undefined ? deltaY[i].toFixed(2) : '-')}</td>
+        <td>${coords[i].x.toFixed(2)}</td>
+        <td>${coords[i].y.toFixed(2)}</td>
+      </tr>`;
+    }
+    
+    html += `</table>`;
+    html += `<p><strong>خطای بست (متر):</strong> ${f.toFixed(3)}</p>`;
+    html += `<p><strong>نسبت خطا:</strong> 1 : ${errorRatio.toFixed(0)}</p>`;
+    
+    document.getElementById('output').innerHTML = html;
+  }
+</script>
+
+</body>
+</html>
