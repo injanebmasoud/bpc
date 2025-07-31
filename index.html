@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -28,7 +27,7 @@
   </style>
 </head>
 <body>
-  <h1>محاسبه پیمایش بسته</h1>
+  <h1>محاسبه پیمایش بسته (با ژیزمان صحیح)</h1>
 
   <label>آزیموت شروع (درجه):</label>
   <input type="number" id="azimuthStart" value="90"><br><br>
@@ -38,7 +37,7 @@
       <tr>
         <th>نقطه</th>
         <th>زاویه داخلی (°)</th>
-        <th>طول (m)</th>
+        <th>طول ضلع (m)</th>
       </tr>
     </thead>
     <tbody>
@@ -91,23 +90,23 @@
       });
 
       const n = angles.length;
-      const azimuths = [az0];
+      const azimuths = [fixAngle(az0)];
       const deltaX = [], deltaY = [];
 
-      // محاسبه آزیموت‌ها
+      // محاسبه آزیموت‌ها با فرمول درست مسیر ساعت‌گرد
       for (let i = 0; i < n; i++) {
-        const az = fixAngle(azimuths[i] + angles[i]);
+        const az = fixAngle(azimuths[i] + (360 - angles[i]));
         azimuths.push(az);
       }
 
       // محاسبه مؤلفه‌ها
       for (let i = 0; i < n; i++) {
-        const az = degToRad(azimuths[i]);
-        deltaX.push(lengths[i] * Math.sin(az));
-        deltaY.push(lengths[i] * Math.cos(az));
+        const azRad = degToRad(azimuths[i]);
+        deltaX.push(lengths[i] * Math.sin(azRad));
+        deltaY.push(lengths[i] * Math.cos(azRad));
       }
 
-      // محاسبه مختصات با نقطه شروع 1000,1000
+      // محاسبه مختصات با نقطه شروع (1000, 1000)
       const coords = [{x: 1000, y: 1000}];
       for (let i = 0; i < n; i++) {
         const prev = coords[i];
@@ -117,29 +116,28 @@
         });
       }
 
-      // خطای بست
+      // محاسبه خطای بست
       const fx = coords[n].x - 1000;
       const fy = coords[n].y - 1000;
       const fb = Math.sqrt(fx * fx + fy * fy);
       const lenSum = lengths.reduce((a, b) => a + b, 0);
       const errRatio = fb / lenSum;
 
-      // نمایش نتایج
-      let html = `<h3>نتایج</h3><table><tr><th>نقطه</th><th>آزیموت (°)</th><th>ΔX</th><th>ΔY</th><th>X</th><th>Y</th></tr>`;
-      for (let i = 0; i < n + 1; i++) {
+      // نمایش جدول نتایج
+      let html = `<h3>📊 نتایج پیمایش</h3><table><tr><th>نقطه</th><th>آزیموت (°)</th><th>ΔX</th><th>ΔY</th><th>X</th><th>Y</th></tr>`;
+      for (let i = 0; i < coords.length; i++) {
         html += `<tr>
           <td>${i + 1}</td>
           <td>${azimuths[i] !== undefined ? azimuths[i].toFixed(8) : '-'}</td>
-          <td>${deltaX[i] !== undefined ? deltaX[i].toFixed(8) : '-'}</td>
-          <td>${deltaY[i] !== undefined ? deltaY[i].toFixed(8) : '-'}</td>
-          <td>${coords[i].x.toFixed(8)}</td>
-          <td>${coords[i].y.toFixed(8)}</td>
+          <td>${deltaX[i] !== undefined ? deltaX[i].toFixed(4) : '-'}</td>
+          <td>${deltaY[i] !== undefined ? deltaY[i].toFixed(4) : '-'}</td>
+          <td>${coords[i].x.toFixed(4)}</td>
+          <td>${coords[i].y.toFixed(4)}</td>
         </tr>`;
       }
       html += `</table><br>
-        <strong>خطای بست:</strong> ${fb.toFixed(8)} متر<br>
-        <strong>نسبت خطا:</strong> 1:${errRatio > 0 ? Math.round(1 / errRatio) : '∞'}
-      `;
+        <strong>خطای بست:</strong> ${fb.toFixed(4)} متر<br>
+        <strong>نسبت خطا:</strong> 1:${errRatio > 0 ? Math.round(1 / errRatio) : '∞'}`;
 
       document.getElementById('results').innerHTML = html;
     }
