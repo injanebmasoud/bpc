@@ -2,7 +2,7 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>محاسبه پیمایش بسته ساعت‌گرد</title>
+  <title>محاسبه پیمایش بسته ساعت‌گرد با نقطه شروع (1000,1000)</title>
   <style>
     body {
       font-family: Tahoma, sans-serif;
@@ -81,12 +81,10 @@
 <div id="output" class="result"></div>
 
 <script>
-  // تبدیل درجه به رادیان
   function degToRad(deg) {
     return deg * Math.PI / 180;
   }
   
-  // تبدیل رادیان به درجه با محدوده 0-360
   function normalizeDeg(angle) {
     angle = angle % 360;
     return angle < 0 ? angle + 360 : angle;
@@ -103,11 +101,9 @@
     const lines = dataText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     const n = lines.length;
     
-    // آرایه‌ها
     const angles = [];
     const lengths = [];
     
-    // خواندن زاویه داخلی و طول هر ضلع
     for(let i=0; i<n; i++) {
       const parts = lines[i].split(/\s+/);
       if(parts.length < 2){
@@ -124,8 +120,6 @@
       lengths.push(length);
     }
     
-    // محاسبه آزیموت‌ها در پیمایش ساعت‌گرد با فرمول:
-    // A[i+1] = A[i] - (180 - angle[i])
     const azimuths = [normalizeDeg(startAz)];
     for(let i=0; i<n; i++) {
       let newAz = azimuths[i] - (180 - angles[i]);
@@ -133,10 +127,10 @@
       azimuths.push(newAz);
     }
     
-    // محاسبه ΔX و ΔY و مختصات هر نقطه
     const deltaX = [];
     const deltaY = [];
-    const coords = [{x:0, y:0}];
+    // نقطه شروع: 1000, 1000
+    const coords = [{x: 1000, y: 1000}];
     
     for(let i=0; i<n; i++) {
       let rad = degToRad(azimuths[i]);
@@ -147,16 +141,13 @@
       coords.push({x: coords[i].x + dx, y: coords[i].y + dy});
     }
     
-    // محاسبه خطای بست
-    let fx = coords[n].x;
-    let fy = coords[n].y;
+    let fx = coords[n].x - coords[0].x;
+    let fy = coords[n].y - coords[0].y;
     let f = Math.sqrt(fx*fx + fy*fy);
     
-    // جمع طول‌ها
     let Lsum = lengths.reduce((a,b) => a+b, 0);
     let errorRatio = Lsum / f;
     
-    // نمایش نتایج
     let html = `<table>
       <tr><th>نقطه</th><th>آزیموت (°)</th><th>ΔX (متر)</th><th>ΔY (متر)</th><th>X (متر)</th><th>Y (متر)</th></tr>`;
     
